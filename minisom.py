@@ -293,7 +293,7 @@ class MiniSom(object):
 
 
 class TestMinisom(unittest.TestCase):
-    def setup_method(self, method):
+    def setUp(self):
         self.som = MiniSom(5, 5, 1)
         for i in range(5):
             for j in range(5):
