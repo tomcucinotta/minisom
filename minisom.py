@@ -31,8 +31,7 @@ def fast_norm(x):
 class MiniSom(object):
     def __init__(self, x, y, input_len, sigma=1.0, learning_rate=0.5,
                  decay_function=None, neighborhood_function='gaussian',
-                 random_seed=None, batch_size = 0.25, trained_weights=None,
-		 normalize_weights=True):
+                 random_seed=None, trained_weights=None, normalize_weights=True):
         """Initializes a Self Organizing Maps.
 
         Parameters
@@ -72,8 +71,6 @@ class MiniSom(object):
         random_seed : int, optiona (default=None)
             Random seed to use.
         
-        batch_size : percentage of Training Set used in one Epoch
-
         trained_weights : initial weights (to load from previously saved ones)
 
         normalize_weights : whether to normalize weights (default: True)
@@ -91,7 +88,6 @@ class MiniSom(object):
             self._decay_function = lambda x, t, max_iter: x/(1+t/max_iter)
         self._learning_rate = learning_rate
         self._sigma = sigma
-        self._batchSize = batch_size
         self._randomSeed = random_seed
         self._normalizeWeights = normalize_weights
         if trained_weights is not None:
@@ -206,39 +202,33 @@ class MiniSom(object):
                 self._weights[it.multi_index] = self._weights[it.multi_index]/norm
             it.iternext()
 
-    def train_random(self, data, num_iteration):
+    def train_random(self, data, num_iteration, batch_size = 1.0):
         """Trains the SOM picking samples at random from data,
-        if a batch-size is provided, each epoch consists in a batch training of
-        a random subset of data. The next epoch another different subset of data
+        if a batch-size is provided (as a fraction of the input data size),
+        then each epoch consists in a batch training of a random subset of
+        data of size batch_size*len(data). Each epoch another different subset of data
         is provided. To be sure seeing all data through training, the minimum number
-        of epoch is : ceil(len(dataset)/batch_size) """
-        batchSize = int(self._batchSize * len(data))
-        if batchSize == 0:
-            batchSize = len(data)
+        of epochs to use is: ceil(1.0/batch_size) """
+
+        batchSize = round(batch_size * len(data))
         print("Batch-Size: " + str(batchSize))
-        setIdx = arange(len(data))
+        setIdx = np.arange(len(data))
+        currIdx = 0
         self._init_T(num_iteration)
         for iteration in range(num_iteration):
-            if len(setIdx) > batchSize:
-                curr = self._random_generator.permutation(setIdx)[:batchSize]
-                setIdx = np.setdiff1d(setIdx,curr)
-                for x in np.nditer(curr):
-                    self.update(data[x], self.winner(data[x]), iteration)
-            else :
-                for x in np.nditer(setIdx):
-                        self.update(data[x], self.winner(data[x]), iteration)
-                setIdx = arange(len(data))
+            for i in range(batchSize):
+                if currIdx == 0:
+                    setIdx = self._random_generator.permutation(setIdx)
+                self.update(data[setIdx[currIdx]], self.winner(data[setIdx[currIdx]]), iteration)
+                currIdx = (currIdx + 1) % len(setIdx)
         return self._weights
 
     def train_batch(self, data, num_iteration):
-        """Trains using all the vectors in data sequentially,
-        each epoch all samples are updated in different order"""
+        """Trains using all the vectors in data sequentially"""
         self._init_T(num_iteration)
         for iteration in range(num_iteration):
-            setIdx = arange(len(data))
-            self._random_generator.shuffle(setIdx)
-            for x in np.nditer(setIdx):
-                self.update(data[x], self.winner(data[x]), iteration)            
+            for idx in range(len(data)):
+                self.update(data[idx], self.winner(data[idx]), iteration)
         return self._weights
 
     def _init_T(self, num_iteration):
