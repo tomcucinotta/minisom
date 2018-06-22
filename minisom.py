@@ -211,7 +211,6 @@ class MiniSom(object):
         of epochs to use is: ceil(1.0/batch_size) """
 
         batchSize = round(batch_size * len(data))
-        print("Batch-Size: " + str(batchSize))
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
@@ -223,12 +222,21 @@ class MiniSom(object):
                 currIdx = (currIdx + 1) % len(setIdx)
         return self._weights
 
-    def train_seq(self, data, num_iteration):
-        """Trains using all the vectors in data sequentially"""
+    def train_seq(self, data, num_iteration, batch_size = 1.0):
+        """Trains using all the vectors in data sequentially
+        if a batch-size is provided (as a fraction of the input data size),
+        then each epoch consists in training using the next batch_size*len(data) input
+        samples. To be sure seeing all data through training, the minimum number
+        of epochs to use is: ceil(1.0/batch_size) """
+
+        batchSize = round(batch_size * len(data))
+        setIdx = np.arange(len(data))
+        currIdx = 0
         self._init_T(num_iteration)
         for iteration in range(num_iteration):
-            for idx in range(len(data)):
-                self.update(data[idx], self.winner(data[idx]), iteration)
+            for i in range(batchSize):
+                self.update(data[setIdx[currIdx]], self.winner(data[setIdx[currIdx]]), iteration)
+                currIdx = (currIdx + 1) % len(setIdx)
         return self._weights
 
     def _init_T(self, num_iteration):
