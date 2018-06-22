@@ -223,7 +223,7 @@ class MiniSom(object):
                 currIdx = (currIdx + 1) % len(setIdx)
         return self._weights
 
-    def train_batch(self, data, num_iteration):
+    def train_seq(self, data, num_iteration):
         """Trains using all the vectors in data sequentially"""
         self._init_T(num_iteration)
         for iteration in range(num_iteration):
@@ -343,11 +343,11 @@ class TestMinisom(unittest.TestCase):
         # same state after training
         assert_array_almost_equal(som1._weights, som2._weights)
 
-    def test_train_batch(self):
+    def test_train_seq(self):
         som = MiniSom(5, 5, 2, sigma=1.0, learning_rate=0.5, random_seed=1)
         data = array([[4, 2], [3, 1]])
         q1 = som.quantization_error(data)
-        som.train_batch(data, 10)
+        som.train_seq(data, 10)
         assert q1 > som.quantization_error(data)
 
     def test_train_random(self):
