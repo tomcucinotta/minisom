@@ -1,4 +1,7 @@
-    # https://github.com/JustGlowing/minisom/blob/master/minisom.py
+# Original version from: https://github.com/JustGlowing/minisom/blob/master/minisom.py
+# Modified by: Antonio Ritacco <...@santannapisa.it>
+# Modified by: Tommaso Cucinotta <...@santannapisa.it>
+
 from math import sqrt
 
 from numpy import (array, unravel_index, nditer, linalg, random, subtract,
@@ -19,6 +22,7 @@ import unittest
 
 def fast_norm(x):
     """Returns norm-2 of a 1-D numpy array.
+
     * faster than linalg.norm in case of 1-D arrays (numpy 1.9.2rc1).
     """
     return sqrt(dot(x, x.T))
@@ -27,18 +31,24 @@ def fast_norm(x):
 class MiniSom(object):
     def __init__(self, x, y, input_len, sigma=1.0, learning_rate=0.5,
                  decay_function=None, neighborhood_function='gaussian',
-                 random_seed=None, batch_size = 0.25,trained_weights=None):
+                 random_seed=None, batch_size = 0.25, trained_weights=None,
+		 normalize_weights=True):
         """Initializes a Self Organizing Maps.
+
         Parameters
         ----------
         decision_tree : decision tree
         The decision tree to be exported.
+
         x : int
             x dimension of the SOM
+
         y : int
             y dimension of the SOM
+
         input_len : int
             Number of the elements of the vectors in input.
+
         sigma : float, optional (default=1.0)
             Spread of the neighborhood function, needs to be adequate
             to the dimensions of the map.
@@ -48,18 +58,25 @@ class MiniSom(object):
             (at the iteration t we have
             learning_rate(t) = learning_rate / (1 + t/T)
             where T is #num_iteration/2)
+
         decay_function : function (default=None)
             Function that reduces learning_rate and sigma at each iteration
             default function:
             lambda x, current_iteration, max_iter :
                         x/(1+current_iteration/max_iter)
+
         neighborhood_function : function, optional (default='gaussian')
             Function that weights the neighborhood of a position in the map
             possible values: 'gaussian', 'mexican_hat'
+
         random_seed : int, optiona (default=None)
             Random seed to use.
         
         batch_size : percentage of Training Set used in one Epoch
+
+        trained_weights : initial weights (to load from previously saved ones)
+
+        normalize_weights : whether to normalize weights (default: True)
 
         """
         if sigma >= x/2.0 or sigma >= y/2.0:
@@ -76,20 +93,21 @@ class MiniSom(object):
         self._sigma = sigma
         self._batchSize = batch_size
         self._randomSeed = random_seed
-        if(trained_weights is not None):
+        self._normalizeWeights = normalize_weights
+        if trained_weights is not None:
             # There's a pre-trained Weight matrix
-            if (trained_weights.shape[0] == x & trained_weights.shape[1] == y):
-                # With an adequate dimension
-                self._weights = trained_weights
+            assert trained_weights.shape[0] == x and trained_weights.shape[1] == y
+            self._weights = trained_weights
         else:
             # New training -> random initialization
             # Random inizialization between (-1,1)
             self._weights = self._random_generator.rand(x, y, input_len)*2-1
-            # for i in range(x):
-            #     for j in range(y):
-            #         # normalization
-            #         norm = fast_norm(self._weights[i, j])
-            #         self._weights[i, j] = self._weights[i, j] / norm
+        if self._normalizeWeights:
+            for i in range(x):
+                for j in range(y):
+                    # normalization
+                    norm = fast_norm(self._weights[i, j])
+                    self._weights[i, j] = self._weights[i, j] / norm
         self._activation_map = zeros((x, y))
         self._neigx = arange(x)
         self._neigy = arange(y)  # used to evaluate the neighborhood function
@@ -142,6 +160,7 @@ class MiniSom(object):
 
     def update(self, x, win, t):
         """Updates the weights of the neurons.
+
         Parameters
         ----------
         x : np.array
@@ -152,7 +171,6 @@ class MiniSom(object):
             Iteration index
         """
         eta = self._decay_function(self._learning_rate, t, self.T)
-        #print("Lr: "+str(eta))
         # sigma and learning rate decrease with the same rule
         sig = self._decay_function(self._sigma, t, self.T)
         # improves the performances
@@ -163,8 +181,9 @@ class MiniSom(object):
             x_w = (x - self._weights[it.multi_index])
             self._weights[it.multi_index] += g[it.multi_index] * x_w
             # normalization
-            # norm = fast_norm(self._weights[it.multi_index])
-            # self._weights[it.multi_index] = self._weights[it.multi_index]/norm
+            if self._normalizeWeights:
+                norm = fast_norm(self._weights[it.multi_index])
+                self._weights[it.multi_index] = self._weights[it.multi_index]/norm
             it.iternext()
 
     def quantization(self, data):
@@ -182,24 +201,25 @@ class MiniSom(object):
         while not it.finished:
             rand_i = self._random_generator.randint(len(data))
             self._weights[it.multi_index] = data[rand_i]
-            # norm = fast_norm(self._weights[it.multi_index])
-            # self._weights[it.multi_index] = self._weights[it.multi_index]/norm
+            if self._normalizeWeights:
+                norm = fast_norm(self._weights[it.multi_index])
+                self._weights[it.multi_index] = self._weights[it.multi_index]/norm
             it.iternext()
 
     def train_random(self, data, num_iteration):
         """Trains the SOM picking samples at random from data,
         if a batch-size is provided, each epoch consists in a batch training of
-        a random subset of data. The next epoch another different subset of of data
+        a random subset of data. The next epoch another different subset of data
         is provided. To be sure seeing all data through training, the minimum number
         of epoch is : ceil(len(dataset)/batch_size) """
         batchSize = int(self._batchSize * len(data))
-        if(batchSize==0):
+        if batchSize == 0:
             batchSize = len(data)
-        print("Batch-Size: "+str(batchSize))
+        print("Batch-Size: " + str(batchSize))
         setIdx = arange(len(data))
         self._init_T(num_iteration)
         for iteration in range(num_iteration):
-            if(len(setIdx)>batchSize):
+            if len(setIdx) > batchSize:
                 curr = self._random_generator.permutation(setIdx)[:batchSize]
                 setIdx = np.setdiff1d(setIdx,curr)
                 for x in np.nditer(curr):
