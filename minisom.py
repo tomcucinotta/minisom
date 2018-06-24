@@ -2,13 +2,16 @@
 # Modified by: Antonio Ritacco <...@santannapisa.it>
 # Modified by: Tommaso Cucinotta <...@santannapisa.it>
 
+import ctypes
+from multiprocessing import (Pool, cpu_count, RawArray)
+from multiprocessing.pool import ApplyResult
+from collections import defaultdict
 from math import sqrt
-
 from numpy import (array, unravel_index, nditer, linalg, random, subtract,
                    power, exp, pi, zeros, arange, outer, meshgrid, dot)
-from collections import defaultdict
-from warnings import warn
 import numpy as np
+import os
+from warnings import warn
 
 # for unit tests
 from numpy.testing import assert_almost_equal, assert_array_almost_equal
@@ -27,11 +30,37 @@ def fast_norm(x):
     """
     return sqrt(dot(x, x.T))
 
+_x = None
+_weights = None
+_activation_map = None
+
+def _activate_neurons(id, row_beg, row_end):
+        global _x, _weights, _activation_map
+#        print("Process " + str(id) + " activating neurons from " + str(row_beg) + " to " + str(row_end))
+        s = np.subtract(_weights[row_beg:row_end], _x)
+        if isinstance(_x, np.ndarray):
+#            print("s.shape=" + str(s.shape) + ", x.shape=" + str(x.shape))
+            _activation_map[row_beg:row_end] = np.sqrt(np.sum(np.multiply(s, s), axis = 2))
+        else:
+#            print("s.shape=" + str(s.shape) + ", x=" + str(x))
+            _activation_map[row_beg:row_end] = abs(s) #np.sqrt(np.multiply(s, s))
+        return 1
+        # k=0
+        # while (not it.finished) and (it_end.finished or it.multi_index != it_end.multi_index):
+        #     s = subtract(x, self._weights[it.multi_index])  # x - w[it]
+        #     # || x - w ||
+        #     self._activation_map[it.multi_index] = fast_norm(s)
+        #     it.iternext()
+        #     k=k+1
+#        print("Made " + str(k) + " inputs")
+
+
 
 class MiniSom(object):
     def __init__(self, x, y, input_len, sigma=1.0, learning_rate=0.5,
                  decay_function=None, neighborhood_function='gaussian',
-                 random_seed=None, trained_weights=None, normalize_weights=True,
+                 random_seed=None, cpus=cpu_count(),
+                 trained_weights=None, normalize_weights=True,
                  neigh_threshold=0.0):
         """Initializes a Self Organizing Maps.
 
@@ -71,7 +100,10 @@ class MiniSom(object):
 
         random_seed : int, optiona (default=None)
             Random seed to use.
-        
+
+        cpus : int (default=os.cpu_count())
+            How many CPUs to use
+
         trained_weights : initial weights (to load from previously saved ones)
 
         normalize_weights : whether to normalize weights (default: True)
@@ -79,6 +111,7 @@ class MiniSom(object):
         neigh_threshold : limit neighborhood to cells where g[] is bigger than this value times g[bmu]
 
         """
+        global _x, _weights, _activation_map
         if sigma >= x/2.0 or sigma >= y/2.0:
             warn('Warning: sigma is too high for the dimension of the map.')
         if random_seed:
@@ -94,21 +127,28 @@ class MiniSom(object):
         self._randomSeed = random_seed
         self._normalizeWeights = normalize_weights
         self._neigh_threshold = neigh_threshold
+
+        self._weights = np.frombuffer(RawArray(ctypes.c_double, x*y*input_len)).reshape((x,y,input_len))
+        _weights = self._weights
+
         if trained_weights is not None:
             # There's a pre-trained Weight matrix
             assert trained_weights.shape[0] == x and trained_weights.shape[1] == y
-            self._weights = trained_weights
+            self._weights[:,:,:] = trained_weights
         else:
             # New training -> random initialization
             # Random inizialization between (-1,1)
-            self._weights = self._random_generator.rand(x, y, input_len)*2-1
+            self._weights[:,:,:] = self._random_generator.rand(x, y, input_len)*2-1
         if self._normalizeWeights:
             for i in range(x):
                 for j in range(y):
                     # normalization
                     norm = fast_norm(self._weights[i, j])
                     self._weights[i, j] = self._weights[i, j] / norm
-        self._activation_map = zeros((x, y))
+        self._activation_map = np.frombuffer(RawArray(ctypes.c_double, x*y)).reshape((x,y))
+        self._activation_map[:,:] = np.zeros((x, y))
+        _activation_map = self._activation_map
+        _x = np.frombuffer(RawArray(ctypes.c_double, input_len))
         self._neigx = arange(x)
         self._neigy = arange(y)  # used to evaluate the neighborhood function
         neig_functions = {'gaussian': self._gaussian,
@@ -118,6 +158,8 @@ class MiniSom(object):
             raise ValueError(msg % (neighborhood_function,
                                     ', '.join(neig_functions.keys())))
         self.neighborhood = neig_functions[neighborhood_function]
+        self._pool = Pool(processes = cpus)
+        self._cpus = cpus
 
     def get_weights(self):
         """Returns the weights of the neural network"""
@@ -126,12 +168,18 @@ class MiniSom(object):
     def _activate(self, x):
         """Updates matrix activation_map, in this matrix
            the element i,j is the response of the neuron i,j to x"""
-        s = subtract(x, self._weights)  # x - w
-        it = nditer(self._activation_map, flags=['multi_index'])
-        while not it.finished:
-            # || x - w ||
-            self._activation_map[it.multi_index] = fast_norm(s[it.multi_index])
-            it.iternext()
+
+        global _x, _weights, _activation_map
+
+        cpus = min(self._cpus, self._weights.shape[0])
+        _x[:] = x
+        myfutures = [ self._pool.apply_async(_activate_neurons, args = (i,
+                            round(i * self._weights.shape[0] / cpus),
+                            round((i+1) * self._weights.shape[0] / cpus)))
+                      for i in range(cpus) ]
+
+        for f in myfutures:
+            f.get()
 
     def activate(self, x):
         """Returns the activation map to x"""
@@ -175,6 +223,7 @@ class MiniSom(object):
         sig = self._decay_function(self._sigma, t, self.T)
         # improves the performances
         g = self.neighborhood(win, sig)*eta
+
         # stop neighborhood at the point where g[] goes below 10% of its max value g[win]
         for coord in np.argwhere(g >= self._neigh_threshold*g[win]):
             c = tuple(coord)
@@ -301,7 +350,7 @@ class TestMinisom(unittest.TestCase):
             for j in range(5):
                 # checking weights normalization
                 assert_almost_equal(1.0, linalg.norm(self.som._weights[i, j]))
-        self.som._weights = zeros((5, 5))  # fake weights
+        self.som._weights[:, :] = zeros((5, 5, 1))  # fake weights
         self.som._weights[2, 3] = 5.0
         self.som._weights[1, 1] = 2.0
 
