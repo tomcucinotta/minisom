@@ -175,19 +175,16 @@ class MiniSom(object):
         sig = self._decay_function(self._sigma, t, self.T)
         # improves the performances
         g = self.neighborhood(win, sig)*eta
-        neigh_thresh = self._neigh_threshold*g[win]
-        it = nditer(g, flags=['multi_index'])
-        while not it.finished:
-            # stop neighborhood at the point where g[] goes below 10% of its max value g[win]
-            if g[it.multi_index] >= neigh_thresh:
-                # eta * neighborhood_function * (x-w)
-                x_w = (x - self._weights[it.multi_index])
-                self._weights[it.multi_index] += g[it.multi_index] * x_w
-                # normalization
-                if self._normalizeWeights:
-                    norm = fast_norm(self._weights[it.multi_index])
-                    self._weights[it.multi_index] = self._weights[it.multi_index]/norm
-            it.iternext()
+        # stop neighborhood at the point where g[] goes below 10% of its max value g[win]
+        for coord in np.argwhere(g >= self._neigh_threshold*g[win]):
+            c = tuple(coord)
+            # eta * neighborhood_function * (x-w)
+            x_w = (x - self._weights[c])
+            self._weights[c] += g[c] * x_w
+            # normalization
+            if self._normalizeWeights:
+                norm = fast_norm(self._weights[c])
+                self._weights[c] = self._weights[c]/norm
 
     def quantization(self, data):
         """Assigns a code book (weights vector of the winning neuron)
