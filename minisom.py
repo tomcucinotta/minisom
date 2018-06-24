@@ -173,13 +173,15 @@ class MiniSom(object):
         g = self.neighborhood(win, sig)*eta
         it = nditer(g, flags=['multi_index'])
         while not it.finished:
-            # eta * neighborhood_function * (x-w)
-            x_w = (x - self._weights[it.multi_index])
-            self._weights[it.multi_index] += g[it.multi_index] * x_w
-            # normalization
-            if self._normalizeWeights:
-                norm = fast_norm(self._weights[it.multi_index])
-                self._weights[it.multi_index] = self._weights[it.multi_index]/norm
+            # stop neighborhood at the point where g[] goes below 10% of its max value g[win]
+            if g[it.multi_index] >= 0.1*g[win]:
+                # eta * neighborhood_function * (x-w)
+                x_w = (x - self._weights[it.multi_index])
+                self._weights[it.multi_index] += g[it.multi_index] * x_w
+                # normalization
+                if self._normalizeWeights:
+                    norm = fast_norm(self._weights[it.multi_index])
+                    self._weights[it.multi_index] = self._weights[it.multi_index]/norm
             it.iternext()
 
     def quantization(self, data):
