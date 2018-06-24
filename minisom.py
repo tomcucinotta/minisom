@@ -31,7 +31,8 @@ def fast_norm(x):
 class MiniSom(object):
     def __init__(self, x, y, input_len, sigma=1.0, learning_rate=0.5,
                  decay_function=None, neighborhood_function='gaussian',
-                 random_seed=None, trained_weights=None, normalize_weights=True):
+                 random_seed=None, trained_weights=None, normalize_weights=True,
+                 neigh_threshold=0.0):
         """Initializes a Self Organizing Maps.
 
         Parameters
@@ -75,6 +76,8 @@ class MiniSom(object):
 
         normalize_weights : whether to normalize weights (default: True)
 
+        neigh_threshold : limit neighborhood to cells where g[] is bigger than this value times g[bmu]
+
         """
         if sigma >= x/2.0 or sigma >= y/2.0:
             warn('Warning: sigma is too high for the dimension of the map.')
@@ -90,6 +93,7 @@ class MiniSom(object):
         self._sigma = sigma
         self._randomSeed = random_seed
         self._normalizeWeights = normalize_weights
+        self._neigh_threshold = neigh_threshold
         if trained_weights is not None:
             # There's a pre-trained Weight matrix
             assert trained_weights.shape[0] == x and trained_weights.shape[1] == y
@@ -171,10 +175,11 @@ class MiniSom(object):
         sig = self._decay_function(self._sigma, t, self.T)
         # improves the performances
         g = self.neighborhood(win, sig)*eta
+        neigh_thresh = self._neigh_threshold*g[win]
         it = nditer(g, flags=['multi_index'])
         while not it.finished:
             # stop neighborhood at the point where g[] goes below 10% of its max value g[win]
-            if g[it.multi_index] >= 0.1*g[win]:
+            if g[it.multi_index] >= neigh_thresh:
                 # eta * neighborhood_function * (x-w)
                 x_w = (x - self._weights[it.multi_index])
                 self._weights[it.multi_index] += g[it.multi_index] * x_w
