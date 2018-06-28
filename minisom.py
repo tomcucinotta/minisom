@@ -21,11 +21,20 @@ import unittest
 
 
 def fast_norm(x):
-    """Returns norm-2 of a 1-D numpy array.
+    """Returns norm-2 of a 1-D numpy array
 
     * faster than linalg.norm in case of 1-D arrays (numpy 1.9.2rc1).
     """
     return sqrt(dot(x, x.T))
+
+
+def fast_norm_nan(x):
+    """Returns norm-2 of a 1-D numpy array, limited to the finite values
+
+    * faster than linalg.norm in case of 1-D arrays (numpy 1.9.2rc1).
+    """
+    y = x[np.isfinite(x)]
+    return sqrt(dot(y, y.T))
 
 
 class MiniSom(object):
@@ -130,7 +139,7 @@ class MiniSom(object):
         it = nditer(self._activation_map, flags=['multi_index'])
         while not it.finished:
             # || x - w ||
-            self._activation_map[it.multi_index] = fast_norm(s[it.multi_index])
+            self._activation_map[it.multi_index] = fast_norm_nan(s[it.multi_index])
             it.iternext()
 
     def activate(self, x):
@@ -274,23 +283,29 @@ class MiniSom(object):
         """
         a = zeros((self._weights.shape[0], self._weights.shape[1]))
         for x in data:
-            a[self.winner(x)] += 1
+            if np.sum(np.isfinite(x)) > 0:
+                a[self.winner(x)] += 1
         return a
 
     def quantization_error(self, data):
         """Returns the quantization error computed as the average
-        distance between each input sample and its best matching unit."""
+        distance between each non-null input sample and its best matching unit."""
         error = 0
+        num = 0
         for x in data:
-            error += fast_norm(x-self._weights[self.winner(x)])
-        return error/len(data)
+            num_finite = np.sum(np.isfinite(x))
+            if num_finite > 0:
+                error += fast_norm_nan(x - self._weights[self.winner(x)])
+                num += num_finite / np.size(x)
+        return error / num
 
     def win_map(self, data):
         """Returns a dictionary wm where wm[(i,j)] is a list
         with all the patterns that have been mapped in the position i,j."""
         winmap = defaultdict(list)
         for x in data:
-            winmap[self.winner(x)].append(x)
+            if np.sum(np.isfinite(x)) > 0:
+                winmap[self.winner(x)].append(x)
         return winmap
 
 
