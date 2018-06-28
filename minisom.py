@@ -163,6 +163,8 @@ class MiniSom(object):
 
     def winner(self, x):
         """Computes the coordinates of the winning neuron for the sample x"""
+        if np.sum(np.isfinite(x)) == 0:
+            return None
         self._activate(x)
         return unravel_index(self._activation_map.argmin(),
                              self._activation_map.shape)
