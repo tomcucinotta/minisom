@@ -229,7 +229,12 @@ class MiniSom(object):
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
+        perc = -1
         for iteration in range(num_iteration):
+            new_perc = int(100 * iteration / num_iteration)
+            if new_perc > perc:
+                print("Training [" + str(new_perc) + "%]...")
+                perc = new_perc
             for i in range(batchSize):
                 if currIdx == 0:
                     setIdx = self._random_generator.permutation(setIdx)
@@ -248,7 +253,12 @@ class MiniSom(object):
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
+        perc = -1
         for iteration in range(num_iteration):
+            new_perc = int(100 * iteration / num_iteration)
+            if new_perc > perc:
+                print("Training [" + str(new_perc) + "%]...")
+                perc = new_perc
             for i in range(batchSize):
                 self.update(data[setIdx[currIdx]], self.winner(data[setIdx[currIdx]]), iteration)
                 currIdx = (currIdx + 1) % len(setIdx)
