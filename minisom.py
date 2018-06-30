@@ -309,7 +309,15 @@ class MiniSom(object):
             if np.sum(np.isfinite(x)) > 0:
                 winmap[self.winner(x)].append(x)
         return winmap
-
+    
+    def win_map_ID(self, data):
+        """Returns a dictionary wm where wm[(i,j)] is a list
+        with all the patterns that have been mapped in the position i,j."""
+        winmap = defaultdict(list)
+        for i in range(0,len(data)):
+            if np.sum(np.isfinite(data[i])) > 0:
+                winmap[self.winner(data[i])].append(i)
+        return winmap
 
 class TestMinisom(unittest.TestCase):
     def setUp(self):
