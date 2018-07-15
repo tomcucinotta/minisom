@@ -217,7 +217,7 @@ class MiniSom(object):
                 self._weights[it.multi_index] = self._weights[it.multi_index]/norm
             it.iternext()
 
-    def train_random(self, data, num_iteration, batch_size = 1.0):
+    def train_random(self, data, num_iteration, batch_size = 1.0, iter_beg = 0, iter_end = None):
         """Trains the SOM picking samples at random from data,
         if a batch-size is provided (as a fraction of the input data size),
         then each epoch consists in a batch training of a random subset of
@@ -225,12 +225,15 @@ class MiniSom(object):
         is provided. To be sure seeing all data through training, the minimum number
         of epochs to use is: ceil(1.0/batch_size) """
 
+        if iter_end is None:
+            iter_end = num_iteration
+
         batchSize = round(batch_size * len(data))
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
         perc = -1
-        for iteration in range(num_iteration):
+        for iteration in range(iter_beg, iter_end):
             new_perc = int(100 * iteration / num_iteration)
             if new_perc > perc:
                 print("Training [" + str(new_perc) + "%]...")
@@ -242,19 +245,22 @@ class MiniSom(object):
                 currIdx = (currIdx + 1) % len(setIdx)
         return self._weights
 
-    def train_seq(self, data, num_iteration, batch_size = 1.0):
+    def train_seq(self, data, num_iteration, batch_size = 1.0, iter_beg = 0, iter_end = None):
         """Trains using all the vectors in data sequentially
         if a batch-size is provided (as a fraction of the input data size),
         then each epoch consists in training using the next batch_size*len(data) input
         samples. To be sure seeing all data through training, the minimum number
         of epochs to use is: ceil(1.0/batch_size) """
 
+        if iter_end is None:
+            iter_end = num_iteration
+
         batchSize = round(batch_size * len(data))
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
         perc = -1
-        for iteration in range(num_iteration):
+        for iteration in range(iter_beg, iter_end):
             new_perc = int(100 * iteration / num_iteration)
             if new_perc > perc:
                 print("Training [" + str(new_perc) + "%]...")
