@@ -217,7 +217,7 @@ class MiniSom(object):
                 self._weights[it.multi_index] = self._weights[it.multi_index]/norm
             it.iternext()
 
-    def train_random(self, data, num_iteration, batch_size = 1.0, iter_beg = 0, iter_end = None):
+    def train_random(self, data, num_iteration, batch_size = 1.0, iter_beg = 0, iter_end = None, show_progress = False):
         """Trains the SOM picking samples at random from data,
         if a batch-size is provided (as a fraction of the input data size),
         then each epoch consists in a batch training of a random subset of
@@ -232,12 +232,13 @@ class MiniSom(object):
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
-        perc = -1
+        progr = -1
         for iteration in range(iter_beg, iter_end):
-            new_perc = int(100 * iteration / num_iteration)
-            if new_perc > perc:
-                print("Training [" + str(new_perc) + "%]...")
-                perc = new_perc
+            if show_progress:
+                new_progr = int(100 * iteration / num_iteration)
+                if new_progr > progr:
+                    print("Training [" + str(new_progr) + "%]...")
+                    progr = new_progr
             for i in range(batchSize):
                 if currIdx == 0:
                     setIdx = self._random_generator.permutation(setIdx)
@@ -245,7 +246,7 @@ class MiniSom(object):
                 currIdx = (currIdx + 1) % len(setIdx)
         return self._weights
 
-    def train_seq(self, data, num_iteration, batch_size = 1.0, iter_beg = 0, iter_end = None):
+    def train_seq(self, data, num_iteration, batch_size = 1.0, iter_beg = 0, iter_end = None, show_progress = False):
         """Trains using all the vectors in data sequentially
         if a batch-size is provided (as a fraction of the input data size),
         then each epoch consists in training using the next batch_size*len(data) input
@@ -259,12 +260,13 @@ class MiniSom(object):
         setIdx = np.arange(len(data))
         currIdx = 0
         self._init_T(num_iteration)
-        perc = -1
+        progr = -1
         for iteration in range(iter_beg, iter_end):
-            new_perc = int(100 * iteration / num_iteration)
-            if new_perc > perc:
-                print("Training [" + str(new_perc) + "%]...")
-                perc = new_perc
+            if show_progress:
+                new_progr = int(100 * iteration / num_iteration)
+                if new_progr > progr:
+                    print("Training [" + str(new_progr) + "%]...")
+                    progr = new_progr
             for i in range(batchSize):
                 self.update(data[setIdx[currIdx]], self.winner(data[setIdx[currIdx]]), iteration)
                 currIdx = (currIdx + 1) % len(setIdx)
