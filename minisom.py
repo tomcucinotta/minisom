@@ -310,14 +310,17 @@ class MiniSom(object):
     def quantization_error(self, data):
         """Returns the quantization error computed as the average
         distance between each non-null input sample and its best matching unit."""
-        error = 0
-        num = 0
+        return np.mean(self.quantization_errors(data))
+
+    def quantization_errors(self, data):
+        """Returns the quantization errors
+        distance between each non-null input sample and its best matching unit."""
+        errors = []
         for x in data:
             num_finite = np.sum(np.isfinite(x))
             if num_finite > 0:
-                error += fast_norm_nan(x - self._weights[self.winner(x)])
-                num += num_finite / np.size(x)
-        return error / num
+                errors.append(fast_norm_nan(x - self._weights[self.winner(x)]))
+        return errors
 
     def win_map(self, data):
         """Returns a dictionary wm where wm[(i,j)] is a list
